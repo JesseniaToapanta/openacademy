@@ -3,6 +3,7 @@
 from odoo import models, fields, api, exceptions
 import time 
 from psycopg2 import IntegrityError
+from datetime import timedelta
    
 def get_uid(self, *a):
 #si se desea ver que nomas tiene la variable usar pdb
@@ -96,8 +97,45 @@ class Session(models.Model):
 #   campo reservado active, siempre debe ser decclarado como boolean
 #   por defecto será true, es decir que al crear una sesión estará activa
      active = fields.Boolean(default=True)
+#     end_date = fields.Date(store=True, compute='_get_end_date')
+#   la línea anterior no permitíacapturar el valor del campo, sólo lo visualizaba
+#   para poder calcularlo se usa el concepto inverse, que se ve acontinuación 
+     end_date = fields.Date(store=True, compute='_get_end_date',
+                            inverse='_set_end_date')
+     attendees_count = fields.Integer(compute='_get_attendees_count', store=True)
+     color = fields.Float() 
+     hours = fields.Float(
+              string="Duration in hours",
+              compute='_get_hours', inverse='_set_hours')
+     
+     @api.depends('duration')
+     def _get_hours(self):
+         for r in self:
+             r.hours = r.duration * 24
+     
+     def _set_hours(self):
+         for r in self:
+             r.duration = r.horus / 24
 
-     @api.depends('seats','attendee_ids')
+     @api.depends('attendee_ids')
+     def _get_attendees_count(self):
+         for record in self:
+             record.attendees_count = attendees_count = len(record.attendee_ids)
+
+     @api.depends('start_date', 'duration')
+     def _get_end_date(self):
+#         import pdb;pdb.set_trace()
+         for record in self.filtered('start_date'):
+             start_date = fields.Datetime.from_string(record.start_date)
+             record.end_date = start_date + timedelta(days=record.duration, seconds=-1)
+
+     def _set_end_date(self):
+          for record in self.filtered('start_date'):
+              start_date = fields.Datetime.from_string(record.start_date)
+              end_date = fields.Datetime.from_string(record.end_date)
+              record.duration = (end_date - start_date).days + 1
+
+     @api.depends('seats', 'attendee_ids')
      def _taken_seats(self):
 #         import pdb;pdb.set_trace()
 #        for record in self:
